@@ -1,0 +1,336 @@
+{
+  "name": "Competitor Intelligence Agent - AI Agent + Scrape.do + Groq",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "competitor-intel-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "agent-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json.body || $json) }}",
+        "options": {
+          "systemMessage": "You are a Competitor Intelligence Agent for an AI automation agency. Research LOCAL COMPETITORS for the target business and turn competitor reviews into evidence-backed sales opportunities. INPUT can include business_name, category, city, optional website, optional competitors array. If competitors are supplied, research those businesses; otherwise use the Google Maps Search tool to find up to 3 strong local competitors. For each selected competitor, use Place Details and then Reviews. Fetch up to 20 reviews per competitor, preferring newestFirst. Analyze ONLY review text returned by the tools. Never claim the target business has these problems. Never invent evidence, complaints, frequencies, statistics, or quotes. Confidence: high=3+ distinct reviews, medium=2, low=1. Only create cold-email hooks for medium/high confidence findings. Every pain point must include evidence from supplied reviews. Return ONLY valid JSON with target_business, competitors_analyzed, reviews_analyzed, top_pain_points, all_pain_points, cold_email_hooks, generated_at.\n\nRequired JSON shape:\n{\"target_business\":{\"name\":\"string\",\"category\":\"string\",\"city\":\"string\",\"website\":null},\"competitors_analyzed\":[],\"reviews_analyzed\":0,\"top_pain_points\":[],\"all_pain_points\":[],\"cold_email_hooks\":[],\"generated_at\":\"ISO-8601\"}"
+        }
+      },
+      "id": "agent-002",
+      "name": "Competitor Intelligence AI Agent",
+      "type": "n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        -600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "agent-003",
+      "name": "Groq Chat Model",
+      "type": "n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search Google Maps for local businesses. Use when you need to discover competitors. Input query should be a normal search phrase such as 'real estate agencies Sydney NSW Australia'. Returns local_results containing title, place_id, data_id, rating, review count, address and contact data.",
+        "method": "GET",
+        "url": "https://api.scrape.do/plugin/google/maps/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "YOUR_SCRAPEDO_TOKEN_HERE"
+            },
+            {
+              "name": "q",
+              "value": "={{ $fromAI('query','Google Maps search query','string') }}"
+            },
+            {
+              "name": "hl",
+              "value": "en"
+            },
+            {
+              "name": "gl",
+              "value": "au"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "agent-004",
+      "name": "Google Maps Search Tool",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        -280,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fetch enriched details for one Google Maps place. Use the place_id returned by the Search tool. Returns place_results with title, address, website, phone, rating, total review count and data_id.",
+        "method": "GET",
+        "url": "https://api.scrape.do/plugin/google/maps/place",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "YOUR_SCRAPEDO_TOKEN_HERE"
+            },
+            {
+              "name": "place_id",
+              "value": "={{ $fromAI('place_id','Google Maps place_id in ChIJ... format','string') }}"
+            },
+            {
+              "name": "hl",
+              "value": "en"
+            },
+            {
+              "name": "gl",
+              "value": "au"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "agent-005",
+      "name": "Google Maps Place Details Tool",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        -20,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fetch structured Google Maps reviews. Use place_id or data_id. Fetch up to 20 reviews. Use newestFirst by default, and ratingLow when you need negative/problem-focused evidence. Returns reviews[] with rating, dates, snippet/text and owner responses where available.",
+        "method": "GET",
+        "url": "https://api.scrape.do/plugin/google/maps/reviews",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "YOUR_SCRAPEDO_TOKEN_HERE"
+            },
+            {
+              "name": "place_id",
+              "value": "={{ $fromAI('place_id','Google Maps place_id in ChIJ... format','string') }}"
+            },
+            {
+              "name": "data_id",
+              "value": "={{ $fromAI('data_id','Google Maps data_id in 0xHEX:0xHEX format, if available','string') }}"
+            },
+            {
+              "name": "num",
+              "value": "20"
+            },
+            {
+              "name": "sort_by",
+              "value": "newestFirst"
+            },
+            {
+              "name": "hl",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "agent-006",
+      "name": "Google Maps Reviews Tool",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json; let out = raw.output ?? raw.text ?? raw.response ?? raw; if (typeof out === 'string') { const s = out.replace(/^```json\\s*/,'').replace(/\\s*```$/,'').trim(); try { out = JSON.parse(s); } catch (e) { throw new Error('AI Agent did not return valid JSON: ' + out); } } if (!out || typeof out !== 'object') throw new Error('AI Agent returned an invalid response.'); out.generated_at = out.generated_at || new Date().toISOString(); out.reviews_analyzed = Number(out.reviews_analyzed || 0); return [{json: out}];"
+      },
+      "id": "agent-007",
+      "name": "Format Agent Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "YOUR_GOOGLE_SHEET_URL_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Research Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "target_business": "={{ $json.target_business.name }}",
+            "city": "={{ $json.target_business.city }}",
+            "competitors_analyzed": "={{ JSON.stringify($json.competitors_analyzed) }}",
+            "reviews_analyzed": "={{ $json.reviews_analyzed }}",
+            "top_pain_points": "={{ JSON.stringify($json.top_pain_points) }}",
+            "all_pain_points": "={{ JSON.stringify($json.all_pain_points) }}",
+            "cold_email_hooks": "={{ JSON.stringify($json.cold_email_hooks) }}",
+            "generated_at": "={{ $json.generated_at }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "agent-008",
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -60,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "agent-009",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        180,
+        280
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Competitor Intelligence AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Competitor Intelligence AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Agent Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Agent Output": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Competitor Intelligence AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Maps Search Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Competitor Intelligence AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Maps Place Details Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Competitor Intelligence AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Maps Reviews Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Competitor Intelligence AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ci-agent-scrapedo-v3",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
