@@ -1,0 +1,26 @@
+{
+  "target_business": {
+    "name": "Example Fitness Studio",
+    "category": "Fitness",
+    "city": "London, UK",
+    "website": null
+  },
+  "competitors_analyzed": [
+    {
+      "name": "Example Competitor Gym",
+      "rating": 4.6,
+      "review_count": 128
+    }
+  ],
+  "reviews_analyzed": 20,
+  "top_pain_points": [
+    {
+      "pain_point": "Booking friction",
+      "confidence": "medium",
+      "evidence": "Synthetic example: customers mention difficulty completing bookings online."
+    }
+  ],
+  "all_pain_points": [],
+  "cold_email_hooks": [],
+  "generated_at": "2026-01-01T00:00:00Z"
+}
